@@ -1,0 +1,82 @@
+---
+title: "Wordcloud Instructores"
+output: html_document
+---
+
+Llamar librerias
+```{r setup, include=FALSE}
+
+library(stringr)
+library(text2vec)
+library(tm)
+library(readxl)
+library(stringi)
+library(wordcloud)
+```
+Datos originales
+```{r}
+
+Base <- read_excel("C:/Users/andre/OneDrive - COMISIÓN NACIONAL DEL SERVICIO CIVIL/bde it/SENA 436N2 16Abri.xlsx")
+instructores<- subset(Base, nivel=="Instructor")
+
+
+```
+Limpieza de datos
+```{r}
+#define data preparation function
+Base = Base[1:3877, ]
+prep_fun = function(x) {
+  # make text lower case
+  x = str_to_lower(x)
+  # remove non-alphanumeric symbols
+  x = str_replace_all(x, "[^[:alnum:]]", " ")
+  # Remover tildes
+  x = stri_trans_general(x,"Latin-ASCII")
+  # Remove stop words from text
+  x = removeWords(x, stopwords("sp"))
+  return(x)
+}
+
+t <- proc.time() 
+instructores$prop_clean = prep_fun(instructores$proposito)
+instructores$prop_cl = stripWhitespace(instructores$prop_clean)
+proc.time()-t 
+
+t <- proc.time() 
+instructores$fx_clean = prep_fun(instructores$funciones)
+instructores$fx_cl = stripWhitespace(instructores$fx_clean)
+proc.time()-t 
+
+```
+Feature engineering para proposito
+```{r}
+
+it = itoken(instructores$prop_cl, progressbar = FALSE)
+v = create_vocabulary(it)
+v = prune_vocabulary(v, doc_proportion_max = 1, term_count_min = 1)
+vectorizer = vocab_vectorizer(v)
+
+dtm = create_dtm(it, vectorizer)
+tfidf = TfIdf$new()
+dtm_tfidf = fit_transform(dtm, tfidf)
+
+freq = data.frame(sort(colSums(as.matrix(dtm_tfidf)), decreasing=TRUE))
+wordcloud(rownames(freq), freq[,1], max.words=8, colors=brewer.pal(1, "Dark2"))
+```
+Feature engineering para funciones
+```{r}
+it = itoken(instructores$fx_cl, progressbar = FALSE)
+v = create_vocabulary(it)
+v = prune_vocabulary(v, doc_proportion_max = 1, term_count_min = 1)
+vectorizer = vocab_vectorizer(v)
+
+dtm = create_dtm(it, vectorizer)
+tfidf = TfIdf$new()
+dtm_tfidf = fit_transform(dtm, tfidf)
+
+freq = data.frame(sort(colSums(as.matrix(dtm_tfidf)), decreasing=TRUE))
+wordcloud(rownames(freq), freq[,1], max.words=10, colors=brewer.pal(1, "Dark2"))
+```
+
+
+
